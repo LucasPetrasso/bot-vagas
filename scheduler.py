@@ -18,9 +18,9 @@ REMOTE_ONLY = os.getenv("REMOTE_ONLY", "false").lower() == "true"
 def job():
     print(f"\n⏰ Executando rotina programada de busca às {time.strftime('%H:%M:%S')}...")
     if REMOTE_ONLY:
-        executar_busca(meta_remotas=4, meta_presenciais=0, max_pages_per_term=1)
+        executar_busca(meta_remotas=4, meta_presenciais=0, max_pages_per_term=1, limiar_score=MIN_SCORE)
     else:
-        executar_busca(meta_remotas=2, meta_presenciais=2, max_pages_per_term=1)
+        executar_busca(meta_remotas=2, meta_presenciais=2, max_pages_per_term=1, limiar_score=MIN_SCORE)
 
 def iniciar_agendador():
     print("=" * 60)

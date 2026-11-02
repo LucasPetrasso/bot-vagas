@@ -34,10 +34,10 @@ def verificar_ambiente() -> Dict[str, Any]:
         "perfil_existe": os.path.exists(PERFIL_PATH),
         "gemini_configurado": bool(os.getenv("GEMINI_API_KEY")),
         "telegram_configurado": bool(os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID")),
-        "whatsapp_configurado": bool(os.getenv("WHATSAPP_PHONE_NUMBER_ID") and os.getenv("WHATSAPP_ACCESS_TOKEN")),
+        "whatsapp_configurado": bool(os.getenv("WHATSAPP_PHONE") and os.getenv("WHATSAPP_APIKEY")),
     }
 
-    pacotes_obrigatorios = ["google.genai", "dotenv", "bs4", "requests"]
+    pacotes_obrigatorios = ["google.genai", "dotenv", "bs4", "requests", "schedule", "pytest"]
     for pacote in pacotes_obrigatorios:
         try:
             __import__(pacote)
@@ -59,9 +59,9 @@ def validar_chave_gemini(api_key: str) -> Tuple[bool, str]:
         from google.genai import types
 
         client = genai.Client(api_key=chave_limpa)
-        # Teste leve com gemini-3.1-flash-lite
+        modelo_teste = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
         resposta = client.models.generate_content(
-            model="gemini-3.1-flash-lite",
+            model=modelo_teste,
             contents="Responda estritamente 'OK'",
             config=types.GenerateContentConfig(temperature=0.1)
         )
@@ -247,6 +247,17 @@ def executar_wizard_interativo():
             print("✅ Dados do Telegram registrados.")
     else:
         print("⚪ Configuração do Telegram pulada (você pode configurar depois no .env).")
+
+    # 2.1 WhatsApp Notifier (Opcional)
+    print("\n[Etapa 2.1/3] Alertas no WhatsApp (Opcional)")
+    configurar_whatsapp = input("Deseja configurar alertas via CallMeBot agora? (s/N): ").strip().lower()
+    if configurar_whatsapp == "s":
+        whatsapp_phone = input("Número com código do país (ex.: +5511999999999): ").strip()
+        whatsapp_apikey = input("API key do CallMeBot: ").strip()
+        if whatsapp_phone and whatsapp_apikey:
+            novas_envs["WHATSAPP_PHONE"] = whatsapp_phone
+            novas_envs["WHATSAPP_APIKEY"] = whatsapp_apikey
+            print("✅ Dados do WhatsApp registrados.")
 
     # Salva .env
     salvar_env(novas_envs)

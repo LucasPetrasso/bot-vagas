@@ -81,7 +81,7 @@ class TestAnalisarCompatibilidadeVaga:
         prompt_enviado = kwargs["contents"]
 
         # Valida dados do candidato no prompt
-        assert "Luiz Henrique" in prompt_enviado
+        assert "Lucas Petrasso Gouveia" in prompt_enviado
         assert "Next.js" in prompt_enviado
 
         # Valida dados da vaga no prompt
@@ -340,4 +340,3 @@ class TestAnalisarCompatibilidadeVaga:
         monkeypatch.setattr(gemini_matcher, "os", MagicMock(path=os.path))
         with patch("gemini_matcher.open", side_effect=FileNotFoundError):
             assert carregar_perfil() == {}
-

@@ -14,7 +14,8 @@ class TestScheduler:
         mock_executar.assert_called_once_with(
             meta_remotas=4,
             meta_presenciais=0,
-            max_pages_per_term=1
+            max_pages_per_term=1,
+            limiar_score=scheduler.MIN_SCORE
         )
 
     @patch("scheduler.executar_busca")
@@ -24,7 +25,8 @@ class TestScheduler:
         mock_executar.assert_called_once_with(
             meta_remotas=2,
             meta_presenciais=2,
-            max_pages_per_term=1
+            max_pages_per_term=1,
+            limiar_score=scheduler.MIN_SCORE
         )
 
     @patch("scheduler.schedule")

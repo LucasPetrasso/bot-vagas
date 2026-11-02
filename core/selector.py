@@ -5,7 +5,7 @@ class QuotaSelector:
     """
     Serviço de domínio responsável por aplicar as regras de negócio de cotas:
     - Alocação da meta de vagas remotas
-    - Alocação da meta de vagas presenciais/híbridas em Recife/PE
+    - Alocação da meta de vagas presenciais/híbridas na região configurada do candidato
     - Complementação inteligente quando há déficit em alguma das modalidades
     """
 

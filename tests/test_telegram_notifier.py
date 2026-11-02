@@ -51,7 +51,7 @@ class TestFormatacaoENotificacaoTelegram:
         assert resultado is True
         texto_msg = mock_post.call_args[1]["json"]["text"]
         assert "⭐" in texto_msg
-        assert "📍 <b>LOCAL (RECIFE / OLINDA - PE)</b>" in texto_msg
+        assert "📍 <b>LOCAL / REGIÃO COMPATÍVEL</b>" in texto_msg
         assert "Recife, Pernambuco, Brasil" in texto_msg
 
     @patch("telegram_notifier.requests.post")

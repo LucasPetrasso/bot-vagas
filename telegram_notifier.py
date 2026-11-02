@@ -35,10 +35,10 @@ def formatar_mensagem_telegram(vaga: Dict[str, Any], analise: Dict[str, Any]) ->
     dica = html.escape(str(analise.get("dica_candidatura") or ""))
 
     if fonte == "LinkedIn":
-        badge_modalidade = "🌐 <b>100% REMOTO (BRASIL)</b>" if tipo_modalidade == "REMOTO" else "📍 <b>LOCAL (RECIFE / OLINDA - PE)</b>"
+        badge_modalidade = "🌐 <b>100% REMOTO (BRASIL)</b>" if tipo_modalidade == "REMOTO" else "📍 <b>LOCAL / REGIÃO COMPATÍVEL</b>"
         label_link = "Acessar Vaga no LinkedIn"
     else:
-        badge_modalidade = f"🌐 <b>100% REMOTO (BRASIL)</b> • <i>[Fonte: {fonte}]</i>" if tipo_modalidade == "REMOTO" else f"📍 <b>LOCAL (RECIFE / OLINDA - PE)</b> • <i>[Fonte: {fonte}]</i>"
+        badge_modalidade = f"🌐 <b>100% REMOTO (BRASIL)</b> • <i>[Fonte: {fonte}]</i>" if tipo_modalidade == "REMOTO" else f"📍 <b>LOCAL / REGIÃO COMPATÍVEL</b> • <i>[Fonte: {fonte}]</i>"
         label_link = f"Acessar Vaga no {fonte}"
 
     emoji_score = "🔥" if score >= 80 else "⭐" if score >= 65 else "📌"

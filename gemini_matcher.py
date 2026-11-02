@@ -42,6 +42,46 @@ def limpar_json_resposta(texto: Optional[str]) -> str:
     return t
 
 
+def _classificar_modalidade_deterministica(vaga: Dict[str, Any], perfil: Dict[str, Any]) -> Optional[str]:
+    """Aplica regras locais objetivas antes de aceitar a classificação da IA."""
+    texto = " ".join([
+        str(vaga.get("localizacao") or ""),
+        str(vaga.get("titulo") or ""),
+        str(vaga.get("descricao") or ""),
+        json.dumps(vaga.get("criterios") or {}, ensure_ascii=False),
+    ]).lower()
+
+    termos_remotos = ["100% remoto", "100% remota", "totalmente remoto", "work from home", "home office", "remoto brasil", "remote - brasil"]
+    if any(termo in texto for termo in termos_remotos):
+        return "REMOTO"
+
+    preferencias = perfil.get("preferencias_busca") or {}
+    local_presencial = str(preferencias.get("localizacao_presencial") or perfil.get("localizacao") or "")
+    texto_local = local_presencial.lower()
+    cidades = preferencias.get("cidades_compativeis") or []
+    cidades_texto = [str(c).lower() for c in cidades if str(c).strip()]
+
+    local_siglas = re.findall(r"\b([a-z]{2})\b", texto_local)
+    estado_sigla = local_siglas[-1].upper() if local_siglas else ""
+    cidades_texto.append(texto_local.split(",")[0].strip())
+
+    if any(cidade and cidade in texto for cidade in cidades_texto if cidade):
+        if any(termo in texto for termo in ["presencial", "híbrido", "hibrido", "local", "onsite"]):
+            return "PRESENCIAL_PE"
+
+    for token in ["estados unidos", "united states", "europa", "portugal", "argentina", "canadá", "canada"]:
+        if token in texto:
+            return "INVALIDA"
+
+    if estado_sigla and any(indicador in texto for indicador in ["presencial", "híbrido", "hibrido", "onsite"]):
+        cidades_na_vaga = re.findall(r"\b(?:[a-záàâãéêíóôõúç]+(?:\s+[a-záàâãéêíóôõúç]+){0,2}),\s*([a-z]{2})\b", texto)
+        if any(sigla.upper() == estado_sigla for sigla in cidades_na_vaga):
+            return "PRESENCIAL_PE"
+        return "INVALIDA"
+
+    return None
+
+
 def _extrair_stack_perfil(perfil: Dict[str, Any]) -> str:
     """Extrai uma representação textual das tecnologias do perfil."""
     preferencias = perfil.get("preferencias_busca") or {}
@@ -107,7 +147,7 @@ Descrição:
 ### REGRAS CRÍTICAS:
 1. **MODALIDADE E LOCALIZAÇÃO:**
    - Se for 100% Remota (Brasil ou aceitando do Brasil): defina "tipo_modalidade": "REMOTO".
-   - Se for Presencial ou Híbrida compatível com a região do candidato ({local_candidato} ou Recife, Olinda, Região Metropolitana de Pernambuco / PE): defina "tipo_modalidade": "PRESENCIAL_PE".
+   - Se for Presencial ou Híbrida compatível com a região do candidato ({local_candidato} ou cidades próximas configuradas no perfil): defina "tipo_modalidade": "PRESENCIAL_PE".
    - Se for Presencial ou Híbrida FORA da região de {local_candidato} (ex: presencial em SP, RJ, Curitiba, EUA ou qualquer cidade incompatível): defina "tipo_modalidade": "INVALIDA", "compatibilidade_percentual": 0 e "vale_a_pena_candidatar": false.
 2. **SENIORIDADE:**
    - Se a vaga for Sênior, Tech Lead, Staff ou exigir mais de 2 anos de experiência: defina score = 10 e "vale_a_pena_candidatar": false.
@@ -191,7 +231,12 @@ def analisar_compatibilidade_vaga(
         perfil = carregar_perfil()
     prompt = _gerar_prompt_analise(vaga, perfil)
 
-    modelos = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]
+    modelos_padrao = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]
+    modelos_configurados = os.getenv("GEMINI_MODELS", "")
+    modelos = [m.strip() for m in modelos_configurados.split(",") if m.strip()] or modelos_padrao
+    modelo_unico = os.getenv("GEMINI_MODEL", "").strip()
+    if modelo_unico:
+        modelos = [modelo_unico] + [m for m in modelos if m != modelo_unico]
     ultimo_erro = None
 
     for mod in modelos:
@@ -210,7 +255,14 @@ def analisar_compatibilidade_vaga(
             if not isinstance(resultado, dict):
                 raise ValueError("Resposta do modelo não é um objeto JSON válido")
 
-            return _sanitizar_resposta_gemini(resultado)
+            resultado = _sanitizar_resposta_gemini(resultado)
+            modalidade_deterministica = _classificar_modalidade_deterministica(vaga, perfil)
+            if modalidade_deterministica:
+                resultado["tipo_modalidade"] = modalidade_deterministica
+                if modalidade_deterministica == "INVALIDA":
+                    resultado["compatibilidade_percentual"] = 0
+                    resultado["vale_a_pena_candidatar"] = False
+            return resultado
         except Exception as e:
             ultimo_erro = e
             continue

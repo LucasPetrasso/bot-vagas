@@ -112,11 +112,11 @@ def obter_termos_busca_padrao(perfil: Optional[Dict[str, Any]] = None) -> List[D
     loc_candidato = perfil.get("localizacao") if isinstance(perfil, dict) else None
 
     # Determinar localização para buscas presenciais
-    local_presencial = "Recife, Pernambuco, Brasil"
+    local_presencial = "Santo André, São Paulo, Brasil"
+    if preferencias and isinstance(preferencias, dict):
+        local_presencial = preferencias.get("localizacao_presencial") or local_presencial
     if loc_candidato and isinstance(loc_candidato, str):
-        loc_lower = loc_candidato.lower()
-        if "recife" not in loc_lower and "olinda" not in loc_lower and "pe" not in loc_lower:
-            local_presencial = loc_candidato
+        local_presencial = preferencias.get("localizacao_presencial") if preferencias and preferencias.get("localizacao_presencial") else loc_candidato
 
     if preferencias and isinstance(preferencias, dict) and preferencias.get("termos_busca_customizados"):
         return preferencias["termos_busca_customizados"]
@@ -186,7 +186,8 @@ def enriquecer_descricao_vaga(vaga: Dict[str, Any]) -> None:
 
 def avaliar_candidatos(
     novas_vagas: List[Dict[str, Any]],
-    gemini_client: Any
+    gemini_client: Any,
+    limiar_score: int = 35
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Avalia a compatibilidade das vagas inéditas via Gemini e separa em remotas e presenciais elegíveis.
@@ -209,7 +210,7 @@ def avaliar_candidatos(
 
         print(f"  🎯 Score: {match_obj.score}% | Modalidade: {match_obj.modalidade.value} | Início de Carreira: {match_obj.eh_junior_ou_estagio}", flush=True)
 
-        if not match_obj.eh_elegivel(limiar_score=35):
+        if not match_obj.eh_elegivel(limiar_score=limiar_score):
             print("  ⏭️ Vaga descartada pelos filtros de elegibilidade.\n", flush=True)
             continue
 
@@ -279,7 +280,10 @@ def executar_busca(
     """
     print("=" * 60, flush=True)
     print("🚀 CAÇADOR DE VAGAS: JÚNIOR E ESTÁGIO (MULTI-FONTES)", flush=True)
-    print(f"🎯 META DIÁRIA: {meta_remotas} VAGAS REMOTAS + {meta_presenciais} VAGAS LOCAIS (RECIFE/PE)", flush=True)
+    print(f"🎯 META DIÁRIA: {meta_remotas} VAGAS REMOTAS + {meta_presenciais} VAGAS LOCAIS", flush=True)
+    print(f"🐍 Python: {sys.version.split()[0]} | Perfil: {os.path.basename(os.getenv('PERFIL_CANDIDATO_PATH') or 'perfil_candidato.json')}", flush=True)
+    print(f"🤖 Modelo Gemini: {os.getenv('GEMINI_MODEL') or os.getenv('GEMINI_MODELS') or 'lista padrão'}", flush=True)
+    limiar_score = int(kwargs.get("limiar_score", os.getenv("MIN_SCORE", "35")))
     print("=" * 60, flush=True)
 
     try:
@@ -306,10 +310,10 @@ def executar_busca(
     print(f"\n📊 Total de vagas inéditas filtradas para avaliar: {len(novas_vagas)}\n", flush=True)
 
     # 2. Avaliação de compatibilidade com a IA do Gemini
-    remotas, presenciais = avaliar_candidatos(novas_vagas, gemini_client)
+    remotas, presenciais = avaliar_candidatos(novas_vagas, gemini_client, limiar_score=limiar_score)
 
     print(f"\n📈 Candidatas Remotas elegíveis: {len(remotas)}", flush=True)
-    print(f"📈 Candidatas Locais (Recife/PE) elegíveis: {len(presenciais)}\n", flush=True)
+    print(f"📈 Candidatas Locais elegíveis: {len(presenciais)}\n", flush=True)
 
     # 3. Seleção e balanceamento inteligente de cotas
     selector = QuotaSelector(meta_remotas=meta_remotas, meta_presenciais=meta_presenciais)
@@ -328,9 +332,10 @@ def executar_busca(
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Caçador de Vagas Júnior e Estágio com IA do Gemini")
     parser.add_argument("--remotas", type=int, default=2, help="Meta de vagas remotas diárias (padrão: 2)")
-    parser.add_argument("--presenciais", type=int, default=2, help="Meta de vagas presenciais diárias em Recife/PE (padrão: 2)")
+    parser.add_argument("--presenciais", type=int, default=2, help="Meta de vagas presenciais diárias na região do candidato (padrão: 2)")
     parser.add_argument("--paginas", type=int, default=1, help="Páginas por termo de busca (padrão: 1)")
     parser.add_argument("--fontes", type=str, default=None, help="Lista de fontes separadas por vírgula (ex: linkedin,gupy,programathor,indeed)")
+    parser.add_argument("--min-score", type=int, default=None, help="Pontuação mínima de elegibilidade (padrão: 35 ou MIN_SCORE)")
     parser.add_argument("--test-telegram", action="store_true", help="Testa a conexão e credenciais do Telegram")
     parser.add_argument("--test-whatsapp", action="store_true", help="Testa a conexão e credenciais do WhatsApp")
 
@@ -348,12 +353,15 @@ def main(argv=None):
 
     fontes_lista = [f.strip().lower() for f in args.fontes.split(",")] if args.fontes else None
 
-    executar_busca(
+    kwargs_execucao = dict(
         meta_remotas=args.remotas,
         meta_presenciais=args.presenciais,
         max_pages_per_term=args.paginas,
         fontes=fontes_lista
     )
+    if args.min_score is not None:
+        kwargs_execucao["limiar_score"] = args.min_score
+    executar_busca(**kwargs_execucao)
     return 0
 
 
